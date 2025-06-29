@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slideshow Gambar - Google Drive</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      overflow: hidden;
+      cursor: none;
+    }
+    body.mouse-active {
+      cursor: default;
+    }
+    #slideshow {
+      width: 100vw;
+      height: 100vh;
+      background-color: black;
+      position: relative;
+    }
+    #slideshow img {
+      position: absolute;
+      max-width: 100%;
+      max-height: 100%;
+      top: 0; bottom: 0; left: 0; right: 0;
+      margin: auto;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+    }
+    #controls {
+      position: absolute;
+      top: 15px;
+      right: 70px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+    #controls.visible {
+      opacity: 1;
+    }
+    #controls button, #gearBtn {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 20px;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+    }
+    #controls button:hover, #gearBtn:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+    #gearBtn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      z-index: 10;
+    }
+    #passwordPanel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      color: white;
+      z-index: 20;
+    }
+    #passContainer {
+      position: relative;
+      width: 240px;
+      margin-bottom: 10px;
+    }
+    #passDisplay {
+      width: 100%;
+      font-size: 28px;
+      text-align: center;
+      background: black;
+      color: white;
+      padding: 8px;
+      border: 1px solid white;
+      border-radius: 5px;
+      letter-spacing: 5px;
+    }
+    #togglePass {
+      position: absolute;
+      top: 0;
+      right: 0;
+      height: 100%;
+      background: transparent;
+      color: white;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);
+      gap: 10px;
+      justify-content: center;
+    }
+    .keypad button {
+      font-size: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      background: #444;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .keypad button:hover {
+      background: #666;
+    }
+    #note {
+      margin-top: 10px;
+      font-size: 14px;
+      text-align: center;
+    }
+    #warningMessage {
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 24px;
+      display: none;
+      z-index: 30;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="slideshow">
+    <img id="slide1" src="" style="z-index: 1;" />
+    <img id="slide2" src="" style="z-index: 0;" />
+    <div id="controls">
+      <button onclick="prevImage()">⏮</button>
+      <button onclick="togglePlay()" id="playBtn">⏸</button>
+      <button onclick="nextImage()">⏭</button>
+      <button onclick="toggleFullscreen()">⛶</button>
+    </div>
+    <button id="gearBtn" onclick="togglePasswordPanel()">⚙️</button>
+    <div id="passwordPanel">
+      <div id="passContainer">
+        <input type="password" id="passDisplay" readonly />
+        <button id="togglePass" onclick="togglePasswordVisibility()">👁</button>
+      </div>
+      <div class="keypad">
+        <button onclick="addDigit('1')">1</button>
+        <button onclick="addDigit('2')">2</button>
+        <button onclick="addDigit('3')">3</button>
+        <button onclick="addDigit('4')">4</button>
+        <button onclick="addDigit('5')">5</button>
+        <button onclick="addDigit('6')">6</button>
+        <button onclick="addDigit('7')">7</button>
+        <button onclick="addDigit('8')">8</button>
+        <button onclick="addDigit('9')">9</button>
+        <button onclick="clearPass()">←</button>
+        <button onclick="addDigit('0')">0</button>
+        <button onclick="checkPass()">✔</button>
+      </div>
+      <div id="note">Request Banner: kontak Singgih Putra</div>
+    </div>
+    <div id="warningMessage">HARAP TIDAK MENYENTUH LAYAR BANNER,<br>CUKUP DILIHAT JANGAN DISENTUH</div>
+  </div>
+
+  <script>
+    const API_KEY = "AIzaSyDwo9FX0tA0I5NmSYA04ZSf0LhXXcba6-I";
+    const FOLDER_ID = "1hPC1iwLJV-yB1DQ4q9NOOUOkHSg9J0-x";
+
+    let images = [];
+    let index = 0;
+    let playing = true;
+    let delay = 7000;
+    let active = 0;
+    let cachedImages = [];
+    const img1 = document.getElementById("slide1");
+    const img2 = document.getElementById("slide2");
+    const controls = document.getElementById("controls");
+    const panel = document.getElementById("passwordPanel");
+    const passDisplay = document.getElementById("passDisplay");
+    const warningMessage = document.getElementById("warningMessage");
+
+    function showImage(i) {
+      const current = active % 2 === 0 ? img1 : img2;
+      const next = active % 2 === 0 ? img2 : img1;
+      next.src = images[i];
+      next.style.opacity = 1;
+      current.style.opacity = 0;
+      active++;
+    }
+
+    function nextImage() {
+      index = (index + 1) % images.length;
+      showImage(index);
+    }
+
+    function prevImage() {
+      index = (index - 1 + images.length) % images.length;
+      showImage(index);
+    }
+
+    function togglePlay() {
+      playing = !playing;
+      document.getElementById("playBtn").innerText = playing ? "⏸" : "▶️";
+    }
+
+    function toggleFullscreen() {
+      const elem = document.documentElement;
+      if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => alert(`Error fullscreen: ${err.message}`));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function startSlideshow() {
+      if (images.length === 0) return;
+      showImage(index);
+      setInterval(() => {
+        if (playing) nextImage();
+      }, delay);
+    }
+
+    async function fetchImages() {
+      const url = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&key=${API_KEY}&fields=files(id,name)`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        images = data.files.map(f => `https://lh3.googleusercontent.com/d/${f.id}=w1000`);
+        cachedImages = [...images];
+        if (images.length > 0) {
+          index = 0;
+          startSlideshow();
+        }
+      } catch (err) {
+        console.warn("Gagal mengambil gambar, menggunakan cache.");
+        if (cachedImages.length > 0) {
+          images = [...cachedImages];
+          startSlideshow();
+        } else {
+          alert("Gagal memuat gambar. Cek koneksi internet Anda.");
+        }
+      }
+    }
+
+    setInterval(() => {
+      fetchImages();
+    }, 1800000);
+
+    fetchImages();
+
+    let password = "";
+    let controlsVisible = false;
+    let keypadTimeout;
+    let showPassword = false;
+
+    function togglePasswordPanel() {
+      if (panel.style.display === "flex") {
+        panel.style.display = "none";
+        clearTimeout(keypadTimeout);
+      } else {
+        password = "";
+        passDisplay.value = "";
+        panel.style.display = "flex";
+        startKeypadTimer();
+      }
+    }
+
+    function togglePasswordVisibility() {
+      showPassword = !showPassword;
+      passDisplay.type = showPassword ? "text" : "password";
+      passDisplay.value = showPassword ? password : password.replace(/./g, '*');
+    }
+
+    function startKeypadTimer() {
+      clearTimeout(keypadTimeout);
+      keypadTimeout = setTimeout(() => {
+        panel.style.display = "none";
+      }, 5000);
+    }
+
+    function addDigit(d) {
+      password += d;
+      passDisplay.value = showPassword ? password : password.replace(/./g, '*');
+      startKeypadTimer();
+    }
+
+    function clearPass() {
+      password = password.slice(0, -1);
+      passDisplay.value = showPassword ? password : password.replace(/./g, '*');
+      startKeypadTimer();
+    }
+
+    function checkPass() {
+      if (password === "12345") {
+        controlsVisible = !controlsVisible;
+        controls.classList.toggle("visible", controlsVisible);
+        panel.style.display = "none";
+        clearTimeout(keypadTimeout);
+      } else {
+        alert("Password salah");
+        password = "";
+        passDisplay.value = "";
+        startKeypadTimer();
+      }
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (panel.style.display === "flex") {
+        if (e.key >= '0' && e.key <= '9') addDigit(e.key);
+        if (e.key === "Backspace") clearPass();
+        if (e.key === "Enter") checkPass();
+      }
+    });
+
+    let mouseTimer;
+    document.addEventListener("mousemove", () => {
+      document.body.classList.add("mouse-active");
+      clearTimeout(mouseTimer);
+      mouseTimer = setTimeout(() => {
+        document.body.classList.remove("mouse-active");
+      }, 3000);
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#gearBtn") && !e.target.closest("#passwordPanel") && panel.style.display !== "flex") {
+        warningMessage.style.display = "block";
+        setTimeout(() => warningMessage.style.display = "none", 3000);
+      }
+    });
+  </script>
+</body>
+</html>
